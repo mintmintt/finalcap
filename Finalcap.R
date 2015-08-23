@@ -9,7 +9,6 @@ suppressPackageStartupMessages(c(
         library(plyr),
         library(knitr),
         library(devtools)))
-install.packages('rmarkdown')
 
 ##Swiftkey.zip file
 Url1 <-"https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
