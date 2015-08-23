@@ -1,35 +1,36 @@
-# Predict with Backoff for N-grams
-library(magrittr)
-library(stringr)
-library(RSQLite)
+
 library(tm)
+library(RSQLite)
 source('Finalcap.R')
 
-backoff <- function(raw, db) {
-        
-        max = 3  # max n-gram - 1
-        
-        # process sentence, don't remove stopwords
-        sentence <- tolower(raw) %>%
-                removePunctuation %>%
-                removeNumbers %>%
-                stripWhitespace %>%
-                str_trim %>%
-                strsplit(split=" ") %>%
-                unlist
-        
-        for (i in min(length(sentence), max):1) {
-                gram <- paste(tail(sentence, i), collapse=" ")
-                sql <- paste("SELECT word, freq FROM NGram WHERE ", 
-                             " pre=='", paste(gram), "'",
-                             " AND n==", i + 1, " LIMIT 5", sep="")
-                res <- dbSendQuery(conn=db, sql)
-                predicted <- dbFetch(res, n=-1)
-                names(predicted) <- c("Next Possible Word", "Score (Adjusted Freq)")
-                print(predicted)
-                
-                if (nrow(predicted) > 0) return(predicted)
-        }
-        
-        return("I am not sure what comes next :(")
-}
+db <- dbConnect(SQLite(), dbname="shiny-app/train.db")
+dbSendQuery(conn=db,
+            "CREATE TABLE NGram
+            (pre TEXT,
+            word TEXT,
+            freq INTEGER,
+            n INTEGER)")  # ROWID automatically created with SQLite dialect
+
+# Get word frequencies
+freq_5 <- tdmToFreq(tdm_5)
+freq_4 <- tdmToFreq(tdm_4)
+freq_3 <- tdmToFreq(tdm_3)
+freq_2 <- tdmToFreq(tdm_2)
+
+# Process with pre and current word
+processGram(freq_5)
+processGram(freq_4)
+processGram(freq_3)
+processGram(freq_2)
+
+# Insert into SQLite database
+sql_5 <- "INSERT INTO NGram VALUES ($pre, $cur, $freq, 5)"
+bulk_insert(sql_5, freq_5)
+sql_4 <- "INSERT INTO NGram VALUES ($pre, $cur, $freq, 4)"
+bulk_insert(sql_4, freq_4)
+sql_3 <- "INSERT INTO NGram VALUES ($pre, $cur, $freq, 3)"
+bulk_insert(sql_3, freq_3)
+sql_2 <- "INSERT INTO NGram VALUES ($pre, $cur, $freq, 2)"
+bulk_insert(sql_2, freq_2)
+
+dbDisconnect(db)
