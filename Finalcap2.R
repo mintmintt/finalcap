@@ -3,6 +3,7 @@ library(magrittr)
 library(stringr)
 library(RSQLite)
 library(tm)
+source('Finalcap.R')
 
 backoff <- function(raw, db) {
         
