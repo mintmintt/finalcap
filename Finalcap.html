@@ -1,0 +1,63 @@
+========================================================
+FinalcapRpubs
+
+Capstone Predictive Text
+
+author: jj2015
+
+date: August 23 2015
+
+First Slide
+========================================================
+
+Introduction
+
+This Project was for the Capstone Data Science. It was created to demonstrate that a predictive text model works by analyzing the initial text input and predicting the subsequent word.
+
+
+
+Slide With Code
+========================================================
+
+The Swiftkey.zip is at: (https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). For the sake of this presentation, we will only be using the en_US English files.
+
+- en_US.news.txt
+- en_US.twitter.txt
+- en_US.blogs.txt
+
+
+
+========================================================
+
+The Predictive Algorithm
+
+The alogrithm has a unigram, bigram, trigram, quartgram and pentagram frequency tables.
+
+There will be filtering of the text and Tokenization, followed by preparing the unigram, bigram, trigram, quadgram and pentagram from the data. This was further prepared by n-gram backoff weights (http://www.w3.org/TR/ngram-spec/).
+
+Less than 3% of the data was used to get a faster response time. 
+
+The Shiny app can link is here: https://m123.shinyapps.io/FinalProject
+
+![alt text](image1)
+
+***
+
+This text will appear to the right
+
+========================================================
+
+Further steps forward
+
+- The algorithm used is only up to 5-grams, although this is slightly more than the required. The range can be longer.
+
+- The tm package was used to clean and remove; whitespace, punctuation and convert to lowercase
+
+- Possible increased clustering of the corpus to improve longer sentences may be needed.
+
+- Smoothing and backoff can be further refined for more enhanced predictive analysis, perhaps distant n-gram declarations or other grammar declaration.
+
+
+========================================================
+
+
