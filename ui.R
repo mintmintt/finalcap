@@ -28,7 +28,7 @@ shinyUI(fluidPage(
                 mainPanel(
                         br(),
                         h2(textOutput("sentence"), align="center"),
-                        h1(textOutput("predicted"), align="center", style="color:blue"),
+                        h1(textOutput("predicted"), align="center", style="color:green"),
                         hr()
                 )
         )
