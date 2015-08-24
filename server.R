@@ -1,22 +1,17 @@
-
-library(shiny)
-library(RSQLite)
-source('Finalcap3.R')
-
-# Define server logic required to draw a histogram
 shinyServer(function(input, output) {
-        # input$text and input$action are available
-        # output$sentence and output$predicted should be made available
-        db <- dbConnect(SQLite(), dbname="train.db")
-        dbout <- reactive({ngram_backoff(input$text, db)})
-        
-        output$sentence <- renderText({input$text})
-        output$predicted <- renderText({
-                out <- dbout()
-                if (out[[1]] == "Oops! I can't predict the next word :(") {
-                        return(out)
-                } else {
-                        return(unlist(out)[1])
-                }})
-        output$alts <- renderTable({dbout()})
+    
+    # Use reactive expression, to enable caching, if input parameters (eg: the user string, or the number of alternative predictions to return) have not changed.
+    do_Predict <- reactive({  
+        #PLACEHOLDER# paste("Reactive function activated:", input$txt_input)
+        get_Predicted_Words(input$txt_input, input$sld_num_predictions)
+    })
+            
+    output$txt_prediction <- renderText({
+        head(do_Predict(), 1)  # Return just the first value
+    })
+    
+    output$txt_alternatives <- renderText({
+        paste(do_Predict()[-1], collapse = ", ")  # Return all except the first value
+    })
+    
 })
