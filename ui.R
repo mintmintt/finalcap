@@ -7,7 +7,12 @@ shinyUI(fluidPage(
         ## Application title
         titlePanel("Predictive Word Algorithm"),
         h4("Final Project", style="color:green"),
-        hr(),
+        tags$head(tags$style("#text1, #text2{color: green;
+                                 font-size: 20px;
+                             }"
+  )),
+  br(),
+  br(),
         
         fluidRow(width=5,
                  p("Type a sequence of words, up to 3 words. You can then select the 'NEXT' button for the prediction"),
