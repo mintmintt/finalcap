@@ -1,0 +1,177 @@
+---
+title: "ModelT"
+author: "m123"
+date: "August 24, 2015"
+output: html_document
+---
+
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(tm)
+library(slam)
+library(data.table)
+source('utility.R')
+library(RWeka)
+
+options(mc.cores=1)
+```
+
+N-grams
+
+```{r, echo=FALSE}
+twitter <- samplefile('../data/en_US/en_US.twitter.txt', .02)
+blogs <- samplefile('../data/en_US/en_US.blogs.txt', .02)
+news <- samplefile('../data/en_US/en_US.news.txt', .02)
+```
+
+Corpus
+```{r, echo=FALSE}
+getCorpus <- function(v) {
+  corpus <- VCorpus(VectorSource(v))
+  corpus <- tm_map(corpus, stripWhitespace)  # remove whitespace
+  corpus <- tm_map(corpus, content_transformer(tolower))  # lowercase all
+ # corpus <- tm_map(corpus, removeWords, stopwords("english"))  # rm stopwords
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus 
+}
+
+tCorp <- getCorpus(twitter)
+bCorp <- getCorpus(blogs)
+nCorp <- getCorpus(news)
+```
+
+Grams
+```{r, echo=FALSE}
+UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+PentagramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 5, max = 5))
+
+
+tTdm_2 <- TermDocumentMatrix(tCorp, control = list(tokenize = BigramTokenizer)) 
+tTdm_3 <- TermDocumentMatrix(tCorp, control = list(tokenize = TrigramTokenizer))
+tTdm_4 <- TermDocumentMatrix(tCorp, control = list(tokenize = QuadgramTokenizer))
+tTdm_5 <- TermDocumentMatrix(tCorp, control = list(tokenize = PentagramTokenizer))
+
+bTdm_2 <- TermDocumentMatrix(bCorp, control = list(tokenize = BigramTokenizer)) 
+bTdm_3 <- TermDocumentMatrix(bCorp, control = list(tokenize = TrigramTokenizer))
+bTdm_4 <- TermDocumentMatrix(bCorp, control = list(tokenize = QuadgramTokenizer))
+bTdm_5 <- TermDocumentMatrix(tCorp, control = list(tokenize = PentagramTokenizer))
+
+nTdm_2 <- TermDocumentMatrix(nCorp, control = list(tokenize = BigramTokenizer)) 
+nTdm_3 <- TermDocumentMatrix(nCorp, control = list(tokenize = TrigramTokenizer))
+nTdm_4 <- TermDocumentMatrix(nCorp, control = list(tokenize = QuadgramTokenizer))
+nTdm_5 <- TermDocumentMatrix(tCorp, control = list(tokenize = PentagramTokenizer))
+```
+
+Frequencies
+```{r, echo=FALSE}
+tdmToFreq <- function(tdm) {
+  freq <- sort(row_sums(tdm, na.rm=TRUE), decreasing=TRUE)
+  word <- names(freq)
+  data.table(word=word, freq=freq)
+}
+
+processGram <- function(dt) {
+  dt[, c("pre", "cur"):=list(unlist(strsplit(word, "[ ]+?[a-z]+$")), 
+                                    unlist(strsplit(word, "^([a-z]+[ ])+"))[2]), 
+     by=word]
+}
+```
+
+Bigram
+```{r, echo=FALSE}
+tFreq_2 <- tdmToFreq(tTdm_2)
+nFreq_2 <- tdmToFreq(nTdm_2)
+bFreq_2 <- tdmToFreq(bTdm_2)
+processGram(nFreq_2)
+processGram(bFreq_2)
+tFreq_2[, c("pre", "cur"):=list(unlist(strsplit(word, "[ ]+?[a-z]+$")), 
+                                unlist(strsplit(word, "^([a-z]+[ ])+"))[2]), 
+        by=word]
+head(tFreq_2)
+de_max <- max(tFreq_2[pre=="right"]$freq)
+tFreq_2[pre == "right" & freq == de_max]
+```
+
+Trigram
+```{r, echo=FALSE}
+tFreq_3 <- tdmToFreq(tTdm_3)
+nFreq_3 <- tdmToFreq(nTdm_3)
+bFreq_3 <- tdmToFreq(bTdm_3)
+processGram(nFreq_3)
+processGram(bFreq_3)
+tFreq_3[, c("pre", "cur"):=list(unlist(strsplit(word, "[ ]+?[a-z]+$")), 
+                                unlist(strsplit(word, "^([a-z]+[ ])+"))[2]), 
+        by=word]
+head(tFreq_3)
+
+de_max_3 <- max(tFreq_3[pre == "happy birthday"]$freq)
+tFreq_3[pre == "happy birthday" & freq == de_max_3]
+```
+
+Quadgram
+```{r, echo=FALSE}
+tFreq_4 <- tdmToFreq(tTdm_4)
+nFreq_4 <- tdmToFreq(nTdm_4)
+bFreq_4 <- tdmToFreq(bTdm_4)
+
+processGram(tFreq_4)
+processGram(nFreq_4)
+processGram(bFreq_4)
+
+```
+
+Pentagram
+```{r, echo=FALSE}
+tFreq_5 <- tdmToFreq(tTdm_5)
+nFreq_5 <- tdmToFreq(nTdm_5)
+bFreq_5 <- tdmToFreq(bTdm_5)
+
+processGram(tFreq_5)
+processGram(nFreq_5)
+processGram(bFreq_5)
+
+```
+
+Predicton
+
+```{r, echo=FALSE}
+library(magrittr)
+library(stringr)
+
+ngram_backoff <- function(raw, cluster, db) {
+    max = 2  # max n-gram - 1
+
+    # process sentence
+    sentence <- tolower(raw) %>%
+#        removeWords(words=stopwords("english")) %>%
+        removePunctuation %>%
+        removeNumbers %>%
+        stripWhitespace %>%
+        str_trim %>%
+        strsplit(split=" ") %>%
+        unlist
+
+    for (i in min(length(sentence), max):1) {
+        gram <- paste(tail(sentence, i), collapse=" ")
+        sql <- paste("SELECT word, MAX(freq) FROM NGrams WHERE type==", 
+                     cluster, " AND pre=='", paste(gram), "'",
+                     " AND n==", i + 1,sep="")
+        res <- dbSendQuery(conn=db, sql)
+        predicted <- dbFetch(res, n=-1)
+
+        if (!is.na(predicted[1])) return(predicted)
+    }
+
+    return("Nothing")
+}
+
+test_sentence <- "I cannot figure this out :("
+ngram_backoff("I am going to the", 1, db)
+
+```
