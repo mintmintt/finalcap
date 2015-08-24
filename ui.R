@@ -18,7 +18,7 @@ shinyUI(fluidPage(
                  p("Type a sequence of words, up to 3 words. You can then select the 'NEXT' button for the prediction"),
                  p("Using backoff model",
                    a(href="http://www.w3.org/TR/ngram-spec/", 
-                     "Smoothing and Backoff"), "for unknown ngrams.")),
+                     "Backoff"), "for unknown ngrams.")),
         hr(),
         
         ## Sidebar with a slider input for the number of bins
