@@ -30,5 +30,5 @@ backoff <- function(raw, db) {
                 if (nrow(predicted) > 0) return(predicted)
         }
         
-        return("I am not sure what comes next :(")
+        return("Oops! Don't know how to predict the next word :(")
 }
