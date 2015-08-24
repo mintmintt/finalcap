@@ -1,18 +1,23 @@
-# Utility Functions
-library(magrittr)
+library(ggplot2)
+library(reshape2)
+library(tm)
+library(slam)
 library(data.table)
+source('Finalcap2.R')
 library(RWeka)
 
 options(mc.cores=1)
 
-# Samples from data file
-samplefile <- function(filename, fraction) {
-        system(paste("perl -ne 'print if (rand() < ",
-                     fraction, ")'", filename), intern=TRUE)
-}
+##Testing N-Gram Models
+##Sample from Files
+
+twitter <- samplefile('../data/en_US/en_US.twitter.txt', .02)
+blogs <- samplefile('../data/en_US/en_US.blogs.txt', .02)
+news <- samplefile('../data/en_US/en_US.news.txt', .02)
+
+##Get Corpus
 
 getCorpus <- function(v) {
-        # Processes a vector of documents into a tm Corpus
         corpus <- VCorpus(VectorSource(v))
         corpus <- tm_map(corpus, stripWhitespace)  # remove whitespace
         corpus <- tm_map(corpus, content_transformer(tolower))  # lowercase all
@@ -22,28 +27,139 @@ getCorpus <- function(v) {
         corpus 
 }
 
-tokenize <- function(v) {
-        # Add spaces before and after punctuation,
-        # remove repeat spaces, and split the strings
-        gsub("([^ ])([.?!&])", "\\1 \\2 ", v)   %>%
-                gsub(pattern=" +", replacement=" ")     %>%
-                strsplit(split=" ") %>%
-                unlist
-}
+tCorp <- getCorpus(twitter)
+bCorp <- getCorpus(blogs)
+nCorp <- getCorpus(news)
+
+##Grams
+
+UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+
+tTdm_2 <- TermDocumentMatrix(tCorp, control = list(tokenize = BigramTokenizer)) 
+tTdm_3 <- TermDocumentMatrix(tCorp, control = list(tokenize = TrigramTokenizer))
+tTdm_4 <- TermDocumentMatrix(tCorp, control = list(tokenize = QuadgramTokenizer))
+
+bTdm_2 <- TermDocumentMatrix(bCorp, control = list(tokenize = BigramTokenizer)) 
+bTdm_3 <- TermDocumentMatrix(bCorp, control = list(tokenize = TrigramTokenizer))
+bTdm_4 <- TermDocumentMatrix(bCorp, control = list(tokenize = QuadgramTokenizer))
+
+nTdm_2 <- TermDocumentMatrix(nCorp, control = list(tokenize = BigramTokenizer)) 
+nTdm_3 <- TermDocumentMatrix(nCorp, control = list(tokenize = TrigramTokenizer))
+nTdm_4 <- TermDocumentMatrix(nCorp, control = list(tokenize = QuadgramTokenizer))
+
+##Frequencies
 
 tdmToFreq <- function(tdm) {
-        # Takes tm TermDocumentMatrix and processes into frequency data.table
         freq <- sort(row_sums(tdm, na.rm=TRUE), decreasing=TRUE)
         word <- names(freq)
         data.table(word=word, freq=freq)
 }
 
 processGram <- function(dt) {
-        # Add to n-gram data.table pre (before word) and cur (word itself)
         dt[, c("pre", "cur"):=list(unlist(strsplit(word, "[ ]+?[a-z]+$")), 
                                    unlist(strsplit(word, "^([a-z]+[ ])+"))[2]), 
            by=word]
 }
+
+##Bigram
+
+tFreq_2 <- tdmToFreq(tTdm_2)
+nFreq_2 <- tdmToFreq(nTdm_2)
+bFreq_2 <- tdmToFreq(bTdm_2)
+
+processGram(nFreq_2)
+processGram(bFreq_2)
+
+tFreq_2[, c("pre", "cur"):=list(unlist(strsplit(word, "[ ]+?[a-z]+$")), 
+                                unlist(strsplit(word, "^([a-z]+[ ])+"))[2]), 
+        by=word]
+head(tFreq_2)
+
+de_max <- max(tFreq_2[pre=="right"]$freq)
+tFreq_2[pre == "right" & freq == de_max]
+
+##Trigram
+
+tFreq_3 <- tdmToFreq(tTdm_3)
+nFreq_3 <- tdmToFreq(nTdm_3)
+bFreq_3 <- tdmToFreq(bTdm_3)
+
+processGram(nFreq_3)
+processGram(bFreq_3)
+
+tFreq_3[, c("pre", "cur"):=list(unlist(strsplit(word, "[ ]+?[a-z]+$")), 
+                                unlist(strsplit(word, "^([a-z]+[ ])+"))[2]), 
+        by=word]
+head(tFreq_3)
+
+de_max_3 <- max(tFreq_3[pre == "happy birthday"]$freq)
+tFreq_3[pre == "happy birthday" & freq == de_max_3]
+
+Quadgram
+
+tFreq_4 <- tdmToFreq(tTdm_4)
+nFreq_4 <- tdmToFreq(nTdm_4)
+bFreq_4 <- tdmToFreq(bTdm_4)
+
+processGram(tFreq_4)
+processGram(nFreq_4)
+processGram(bFreq_4)
+
+##Stupid Backoff
+
+library(e1071)
+
+# Training Set
+tTrain <- samplefile('../data/en_US/en_US.twitter.txt', .001) %>% 
+        getCorpus %>% 
+        tm_map(removeWords, stopwords("english"))
+bTrain <- samplefile('../data/en_US/en_US.blogs.txt', .001) %>% 
+        getCorpus %>% 
+        tm_map(removeWords, stopwords("english"))
+nTrain <- samplefile('../data/en_US/en_US.news.txt', .001) %>% 
+        getCorpus %>% 
+        tm_map(removeWords, stopwords("english"))
+
+training.set <- TermDocumentMatrix(c(tTrain, bTrain, nTrain), control=list(wordLengths=c(1,Inf)))
+training.labels <- c(rep(1, length(tTrain)), rep(2, length(nTrain)), rep(3, length(bTrain)))
+
+# Testing Set
+tTest <- samplefile('../data/en_US/en_US.twitter.txt', .0001) %>% 
+        getCorpus %>% 
+        tm_map(removeWords, stopwords("english"))
+bTest <- samplefile('../data/en_US/en_US.blogs.txt', .0001) %>% 
+        getCorpus %>% 
+        tm_map(removeWords, stopwords("english"))
+nTest <- samplefile('../data/en_US/en_US.news.txt', .0001) %>% 
+        getCorpus %>% 
+        tm_map(removeWords, stopwords("english"))
+
+test.set <- TermDocumentMatrix(c(tTest, bTest, nTest), control=list(wordLengths=c(1,Inf)))
+test.labels <- c(rep(1, length(tTest)), rep(2, length(nTest)), rep(3, length(bTest)))
+
+##Training the Naive Bayes classifier:
+
+classifier <- naiveBayes(as.matrix(t(training.set)), as.factor(training.labels))
+
+table(predict(classifier, as.matrix(t(test.set))), test.labels, dnn=list('predicted', 'actual'))
+
+# This does terribly...
+
+Create SQL Database of Grams
+
+library(RSQLite)
+db <- dbConnect(SQLite(), dbname="trained.db")
+dbSendQuery(conn=db,
+            "CREATE TABLE NGrams
+            (gram TEXT,
+            pre TEXT,
+            word TEXT,
+            freq INTEGER,
+            type INTEGER,
+            n INTEGER, PRIMARY KEY (gram, type))")
 
 bulk_insert <- function(sql, key_counts)
 {
@@ -52,28 +168,19 @@ bulk_insert <- function(sql, key_counts)
         dbCommit(db)
 }
 
-UnigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
-BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
-TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
-QuadgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
-PentagramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 5, max = 5))
+translation <- c('twitter', 'news', 'blogs')
 
+##Prediction
 
-# Predict, using N-Grams and Stupid Backoff
 library(magrittr)
 library(stringr)
-library(RSQLite)
-library(tm)
 
-ngram_backoff <- function(raw, db) {
-        # From Brants et al 2007.
-        # Find if n-gram has been seen, if not, multiply by alpha and back off
-        # to lower gram model. Alpha unnecessary here, independent backoffs.
+ngram_backoff <- function(raw, cluster, db) {
+        max = 2  # max n-gram - 1
         
-        max = 3  # max n-gram - 1
-        
-        # process sentence, don't remove stopwords
+        # process sentence
         sentence <- tolower(raw) %>%
+                #        removeWords(words=stopwords("english")) %>%
                 removePunctuation %>%
                 removeNumbers %>%
                 stripWhitespace %>%
@@ -83,16 +190,54 @@ ngram_backoff <- function(raw, db) {
         
         for (i in min(length(sentence), max):1) {
                 gram <- paste(tail(sentence, i), collapse=" ")
-                sql <- paste("SELECT word, freq FROM NGram WHERE ", 
-                             " pre=='", paste(gram), "'",
-                             " AND n==", i + 1, " LIMIT 5", sep="")
+                sql <- paste("SELECT word, MAX(freq) FROM NGrams WHERE type==", 
+                             cluster, " AND pre=='", paste(gram), "'",
+                             " AND n==", i + 1,sep="")
                 res <- dbSendQuery(conn=db, sql)
                 predicted <- dbFetch(res, n=-1)
-                names(predicted) <- c("Next Possible Word", "Score (Adjusted Freq)")
-                print(predicted)
                 
-                if (nrow(predicted) > 0) return(predicted)
+                if (!is.na(predicted[1])) return(predicted)
         }
         
-        return("Sorry! You've stumped me, I don't know what would come next.")
+        return("Nothing")
 }
+
+test_sentence <- "This is such a great day. The happy Birthday!!"
+ngram_backoff("I am going to the", 1, db)
+
+Merged Model
+Process Into SQLite
+
+library(RSQLite)
+
+tdm_2 <- TermDocumentMatrix(c(tCorp, bCorp, nCorp), control = list(tokenize = BigramTokenizer)) 
+tdm_3 <- TermDocumentMatrix(c(tCorp, bCorp, nCorp), control = list(tokenize = TrigramTokenizer))
+tdm_4 <- TermDocumentMatrix(c(tCorp, bCorp, nCorp), control = list(tokenize = QuadgramTokenizer))
+
+db <- dbConnect(SQLite(), dbname="train.db")
+dbSendQuery(conn=db,
+            "CREATE TABLE NGram
+            (gram TEXT,
+            pre TEXT,
+            word TEXT,
+            freq INTEGER,
+            n INTEGER, PRIMARY KEY (gram))")
+
+bulk_insert <- function(sql, key_counts)
+{
+        dbBegin(db)
+        dbGetPreparedQuery(db, sql, bind.data = key_counts)
+        dbCommit(db)
+}
+
+## Get word frequencies
+freq_4 <- tdmToFreq(tdm_4)
+freq_3 <- tdmToFreq(tdm_3)
+freq_2 <- tdmToFreq(tdm_2)
+
+##Process with pre and current word
+processGram(freq_4)
+processGram(freq_3)
+processGram(freq_2)
+
+
