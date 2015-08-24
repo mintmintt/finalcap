@@ -1,3 +1,4 @@
+
 library(shiny)
 
 ## Define UI for application that draws a histogram
@@ -8,10 +9,10 @@ shinyUI(fluidPage(
         h4("Final Project", style="color:green"),
         hr(),
         
-        fluidRow(width=2,
+        fluidRow(width=5,
                  p("Type a sequence of words, up to 3 words. You can then select the 'NEXT' button for the prediction"),
                  p("Using backoff model",
-                   a(href="http://www.cs.cornell.edu/courses/.../smoothing+backoff.pdf", 
+                   a(href="http://www.w3.org/TR/ngram-spec/", 
                      "Smoothing and Backoff"), "for unknown ngrams.")),
         hr(),
         
